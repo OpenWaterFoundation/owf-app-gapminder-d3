@@ -1,0 +1,18 @@
+# Ignore files in repository working files
+# - significant other settings are in the infomapper/.gitignore file
+#   consistent with typical Angular project
+
+# Ignore temporary "junk" and other files often used for work
+junk
+
+# Ignore log files
+*.log
+
+# vim editor files
+
+*.swp
+*.swo
+
+# Microsoft temporary files
+*.tmp
+~$*

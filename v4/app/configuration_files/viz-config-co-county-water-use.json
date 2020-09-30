@@ -1,0 +1,28 @@
+{
+	"Properties":{
+		"DataFileName":"./data/County_Pop_GPCD.csv",
+		"AnnotationsFileName":"",
+		"MainTitleString":"Counties in Colorado",
+		"SubTitleString":"Population(size), Basin(color), Water-Use(x), and Water-Use Rate(y).",
+		"InputDateFormat":"%Y",
+		"OUtputDateFormat":"%Y",
+		"PeriodStart":"2000",
+		"PeriodEnd":"2015",
+		"TimeStep":"1Year",
+		"AnimationSpeed":90,
+		"BottomXAxisTitleString":"Water-Use (acre-feet/year)",
+		"XAxisType":"linear",
+		"LeftYAxisTitleString":"Water-Use Rate (gpcd)",
+		"YAxisType":"linear",
+		"DataXAxisName":"WaterUse",
+		"DataYAxisName":"GPCD",
+		"DataDateName":"Date",
+		"DataMarkerSizingName":"Population_DOLA",
+		"DataGroupingName":"Basin",
+		"DataMarkerName":"County",
+		"TracerNames":"",
+		"AnnotationShapes":"Off",
+		"Interpolate":"Off",
+		"DeveloperToolsEnabled": false
+	}
+}

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<!--Include Javascript files-->
+<script src="http://d3js.org/d3.v4.js"></script>
+<script src="./javascript/jquery-3.2.0.min.js"></script>
+<script src="./javascript/papaparse.min.js"></script>
+<script src="./javascript/bootstrap.min.js"></script>
+<script src="./javascript/select2.min.js"></script>
+<!-- data.js included before closing html tag-->
+<!-- gapminder.js included before closing html tag-->
+<!--Include css files/icon-->
+<link rel="stylesheet" type="text/css" href="./css/bootstrap.min.css">
+<!--<link rel="stylesheet" type="text/css" href="./css/style.css">-->
+<link rel="stylesheet" type="text/css" href="./css/select2.min.css">
+<link rel="shortcut icon" type="image/x-icon" href="images/code.png"/>
+<meta charset="utf-8">
+<title>Developer Tools</title>
+
+<style>
+body{
+	font-size: 12px;
+}
+
+#overview p{
+	margin:5px;
+}
+#variable_names p{
+	margin:5px;
+}
+#errorsDiv p{
+	margin:5px;
+}
+</style>
+
+<head></head>
+
+<body>
+<div>
+	<div style="display:inline-block; padding-right:10px; padding-left:10px; padding-top:5px;">
+		<svg style="width:24px; height: 24px;" id="info"></svg>
+	</div>
+	<div style="display:inline-block; padding-right:10px; padding-top:5px;">
+		<svg style="width:24px; height: 24px;" id="list"></svg>
+	</div>
+	<div style="display:inline-block; padding-right:10px; padding-top:5px;">
+		<svg style="width:24px; height: 24px;" id="errors"></svg>
+	</div>
+</div>
+<hr style="margin:5px;">
+<div id="overview" style="padding:10px; display:inline-block;">
+	<p id="csvfile"><strong>csv file:</strong> none</p>
+	<p id="annotationsfile"><strong>annotations file:</strong> none </p>
+	<hr style="margin:5px;">
+	<p id="xVar"><strong>x variable:</strong> none</p>
+	<p id="yVar"><strong>y variable:</strong> none</p>
+	<p id="size"><strong>size of dot variable:</strong> none</p>
+	<p id="color"><strong>color of dot variable:</strong> none</p>
+	<p id="date"><strong>date variable:</strong> none</p>
+	<hr style="margin:5px;">
+	<p id="speed"><strong>speed:</strong> none</p>
+	<p id="inputDateFormat"><strong>input date format:</strong> none</p>
+	<p id="outputDateFormat"><strong>output date format:</strong> none</p>
+	<p id="periodStart"><strong>period start:</strong> none</p>
+	<p id="periodEnd"><strong>perdiod end:</strong> none</p>
+	<p id="precision"><strong>precision:</strong> none</p>
+	<p id="leftAxis"><strong>left axis:</strong> none</p>
+	<p id="bottomAxis"><strong>bottom axis:</strong> none</p>
+	<p id="tracer"><strong>tracer:</strong> none</p>
+	<p id="annotations"><strong>annotations:</strong> none</p>
+	<hr style="margin:5px">
+	<p id="currdate"><strong>date:</strong> none</p>
+	<hr style="margin:5px;">
+	<p id="errorlist" style="color:red;"><strong style="color:black !important;">errors:</strong> none</p>
+</div>
+<div id="variable_names" style="padding:10px; display:none;">
+	<p id="xVar_"><strong>x variable:</strong> none</p>
+	<p id="yVar_"><strong>y variable:</strong> none</p>
+	<p id="size_"><strong>size of dot variable:</strong> none</p>
+	<p id="color_"><strong>color of dot variable:</strong> none</p>
+	<p id="date_"><strong>date variable:</strong> none</p>
+</div>
+<div id="errorsDiv" style="padding:10px; display:none;">
+	<p id="errorlist_" style="color:red;"></p>
+</div>
+</body>
+
+<script>
+	var url = new URL(window.location.href);
+	error = url.searchParams.get("error");
+	if(error == "true"){
+		d3.select("#overview")
+			.style("display", "none")
+		d3.select("#variable_names")
+			.style("display", "none")
+		d3.select("#errorsDiv")
+			.style("display", "inline-block")
+	}
+</script>
+
+<script>
+	d3.select("#info")
+		.append("svg:image")
+		.attr("xlink:href", "images/info.svg")
+		.on("click", function(){
+			d3.select("#overview")
+				.style("display", "inline-block")
+			d3.select("#variable_names")
+				.style("display", "none")
+			d3.select("#errorsDiv")
+				.style("display", "none")
+		})
+		.append("svg:title")
+		.text("overview");
+
+	d3.select("#list")
+		.append("svg:image")
+		.attr("xlink:href", "images/list.svg")
+		.on("click", function(){
+			d3.select("#overview")
+				.style("display", "none")
+			d3.select("#variable_names")
+				.style("display", "inline-block")
+			d3.select("#errorsDiv")
+				.style("display", "none")
+		})
+		.append("svg:title")
+		.text("variable names");
+
+	d3.select("#errors")
+		.append("svg:image")
+		.attr("xlink:href", "images/error2.svg")
+		.on("click", function(){
+			d3.select("#overview")
+				.style("display", "none")
+			d3.select("#variable_names")
+				.style("display", "none")
+			d3.select("#errorsDiv")
+				.style("display", "inline-block")
+		})
+		.append("svg:title")
+		.text("errors");
+</script>
+
+</html>

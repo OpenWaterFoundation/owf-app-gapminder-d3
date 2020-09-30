@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Highchart Data</title>
+<!-- Javascript -->
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+<script src="javascript/highstock.src.js"></script>
+<script src="javascript/data.js"></script>
+<script src="./javascript/papaparse.min.js"></script>
+<!--<script src="javascript/data.js"></script>-->
+<link rel="shortcut icon" type="image/x-icon" href="images/gapminder-tools-favicon.ico"/>
+<meta charset="utf-8">
+
+<script>
+    var url = new URL(window.location.href);
+    var csvFile = url.searchParams.get("csv");
+    var name = url.searchParams.get("name");
+    var nameVar = url.searchParams.get("nameVar");
+    var xVar = url.searchParams.get("xVar");
+    var yVar = url.searchParams.get("yVar");
+    var size = url.searchParams.get("size");
+    var date = url.searchParams.get("datevariable");
+
+    var dateArray = [];
+    var xSeries = [];
+    var ySeries = [];
+    var sizeSeries = [];
+
+    var data = Papa.parse(csvFile, {
+        header: true,
+        download: true,
+        comments: true,
+        dynamicTyping: true,
+        error: function(error){
+            throwErrorButton();
+            throw new Error;
+        },
+        complete: function(results){
+            results.data.forEach(function(row){
+                if(row[nameVar] == name){
+                    dateArray.push(row[date])
+                    xSeries.push(row[xVar]);
+                    ySeries.push(row[yVar]);
+                    sizeSeries.push(row[size]);
+                }
+            })
+
+            Highcharts.chart('container', {
+                title: {
+                    text: name + " Timeseries"
+                },
+
+                yAxis: {
+                    title: {
+                        text: 'Units'
+                    }
+                },
+                xAxis: {
+                    title: {
+                        text: 'Date'
+                    },
+                    categories: dateArray
+                },
+                legend: {
+                    layout: 'vertical',
+                    align: 'right',
+                    verticalAlign: 'middle'
+                },
+
+                series: [{
+                    name: xVar,
+                    data: xSeries
+                }, {
+                    name: yVar,
+                    data: ySeries
+                }, {
+                    name: size,
+                    data: sizeSeries
+                }],
+
+                responsive: {
+                    rules: [{
+                        condition: {
+                            maxWidth: 500
+                        },
+                        chartOptions: {
+                            legend: {
+                                layout: 'horizontal',
+                                align: 'center',
+                                verticalAlign: 'bottom'
+                            }
+                        }
+                    }]
+                }
+
+            });
+        }
+    });
+</script>
+</head>
+<body>
+    <div id="container"></div>
+</body>
+</html>

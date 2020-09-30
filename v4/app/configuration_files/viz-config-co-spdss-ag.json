@@ -1,0 +1,35 @@
+{
+	"Properties":{
+		"DataFileName":"./data/SP2016.ipy.csv",
+		"AnnotationsFileName":"",
+		"MainTitleString":"South Platte Irrigated Acreage",
+		"SubTitleString":"Total Irrigated Acres(x), Total Sprinkler-Irrigated Acres(y), % of Acres Supplied by Groundwater(size), Water District(color)",
+		"InputDateFormat":"%Y",
+		"OutputDateFormat":"%Y",
+		"PeriodStart":"1950",
+		"PeriodEnd":"2013",
+		"TimeStep":"1Year",
+		"AnimationSpeed":"90",
+
+		"DataXAxisName":"AcTot",
+		"BottomXAxisTitleString":" Total Acres Irrigated",
+		"XAxisScale":"log",
+		"xDataXAxisName":"AcSpr",
+
+		"DataYAxisName":"AcSpr",
+		"LeftYAxisTitleString":"Total Sprinkler-Irrigated Acres (Surface + Ground Water)",
+		"YAxisScale":"log",
+		"xDataYAxisName":"AcTot",
+
+		"DataDateName":"Yr",
+
+		"DataMarkerSizingName":"PercentAcGWtoAcTot",
+
+		"DataGroupingName":"WD",
+		"DataMarkerName":"CULocation",
+		"TracerNames":"",
+		"AnnotationShapes":"Off",
+		"Interpolate": "Off"
+
+	}
+}

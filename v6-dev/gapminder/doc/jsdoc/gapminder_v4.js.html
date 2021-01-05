@@ -1,0 +1,2195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: gapminder_v4.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: gapminder_v4.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * @file Gapminder
+ * @author Justin Rentie &lt;intern2@openwaterfoundation.org>
+ */
+
+/* Layout of gapminder.js file
+1. Create and initialize Globals object to store all variables and avoid global variables
+2. Add/Configure basic DOM element for the Gapminder Visualization and it's tools:
+   -Main Title/Subtitle
+   -Chart div/Svg canvas inside that chart div
+   -Legend div
+   -List div
+   -Year Slider
+   -Datatable and Annotations
+   -Tooltip
+3. Parse CSV Data into Json Object
+4. Call gapminder() function and complete configuring DOM elements:
+   -xScale/xAxis/xaxis
+   -yScale/yAxis/yaxis
+   -Add data to legend
+   -Add providers to dropdown menu
+   -Paths for data tracers
+   -The dots themselves
+5. Functions used throughout:
+   -Various accessors that specify the four demensions of data to visualize
+    	x()
+		y()
+		radius()
+		color()
+		key()
+		date()
+   -Functions used to convert data from csv format to json object
+	    makeJsonObj()
+		createNewObject()
+		checkData()
+		updateJsonObj()
+		initializeDeminsions()
+		updatePath()
+   -Callback functions for dots
+		mousedown()
+		mouseover()
+		mouseout()
+   -Other Callback Functions for various elements brushed()
+		draggedYear()
+		legendButton()
+		selectAllButton()
+		tracerButton()
+		annotationsButton()
+		mouseoverAnnotation()
+		playButton()
+		pauseButton()
+		replayButton()
+		replay()
+		backButton()
+		forwardButton()
+		select2 callback functions
+   -Functions for Running the animation from the visualization
+		playAnimation()
+		setSpeed()
+		stopAnimation()
+		position()
+		order()
+		tweenYear()
+		displayYear()
+		interpolatePath()
+		interpolateData()
+		interpolateValues()
+   -Helper Functions used throughout this javascript file
+		dateArray()
+		parsePrecisionInt()
+		parsePrecisionUnits()
+		checkLogMin()
+		logTicks()
+		getMaxYTicks()
+		getMaxXTicks()
+		getGroupingNames()
+		specificPathData()
+		retrieveAnnotations()
+		retreiveByShape()
+		nest()
+		getIndividualDots()
+		minRadius()
+		getTimeInterpolate()
+		getTime()
+		getAnnotations()
+		getClosest()
+		timeDiff()
+		incrementDate()
+		decrementDate()
+   -Helper Functions that minipulate strings for d3.select() purposes
+		.classSelector
+		checkForSymbol()
+		.id
+		.idSelector
+   -Helper functions that move elements forward or back in the svg canvas
+		.moveToFront
+		.moveToBack
+   -Resizes the whole visualization
+   		resize()
+*/
+
+//Create an object to contain variable names in order to avoid using global variables
+//To call global variables use Globals.variableName
+var Globals = {
+	JsonData: [],
+	CSV:'', jsonMeta: '',
+	title: '', subtitle: '',
+	xVar:0, yVar:0, size:0, dotColor:0,
+	x_axis_label:'', x_axis_type:'',
+	y_axis_label:'', y_axis_type:'', dot_size_label:'',
+	year:'', name:'',
+	precision:'', precisionInt:0, precisionUnit:'',
+	inputDateFormat:'',outputDateFormat:'',
+	yearMin:0, yearMax:0,
+	tracer: false,
+	tracerNames: {},
+	annotationShapes:false,
+	interpolate: false,
+	annotationsURL: '',
+	annotationsJson: '',
+	pathJSON: '',
+	yMin: Infinity, yMax: -Infinity,
+	xMin: Infinity, xMax: -Infinity,
+	radiusMax: -Infinity,
+	width: $("#chart").parent().width(),
+	height: $("#Gapminder").parent().height() - 270,
+	margin: {top:10, left:30, bottom:80, right:82},
+	playEnabled: true,
+	pauseEnabled: true,
+	transition: false,
+	end: false,
+	//is true if all dots are displayed
+	displayAll: true,
+	//keep track of current year
+	currYear: 0,
+	//to see if ever moving backwards in animation and to keep track of year at that point
+	topYear: 0,
+	//keeps track of selected basin if any
+	selectedGroup: '',
+
+	//Initialize variables with information provide in config file 'URL'
+	initialize: function(){
+		var obj = this;
+		$.ajax({
+			url: URL,
+			async: false,
+			dataType: 'json',
+			success: function(data){
+		   		var config = data.Properties;
+
+		   		//TODO: throw errors if file names are not correct
+		   		obj.CSV = config.DataFileName;
+		   		//jsonMeta = config.csv.metadata_file_name;
+		   		obj.annotationsURL = config.AnnotationsFileName;
+
+		   		//title = config.MainTitleString;
+		   		obj.title = config.MainTitleString;
+		   		obj.subtitle = config.SubTitleString;
+
+		   		obj.xVar = config.DataXAxisName;
+		   		obj.yVar = config.DataYAxisName;
+		   		obj.size = config.DataDotSizeName;
+		  		obj.dotColor = config.DataGroupingName;
+		  		obj.year = config.DataDateName;
+		  		obj.name = config.DataDotName;
+
+		   		obj.x_axis_label = config.BottomXAxisTitleString;
+		   		obj.x_axis_type = config.XAxisScale;
+
+		   		obj.y_axis_label = config.LeftYAxisTitleString;
+		   		obj.y_axis_type = config.YAxisScale;
+
+		   		obj.precision = config.Precision;
+
+		   		obj.inputDateFormat = config.InputDateFormat;
+		   		obj.outputDateFormat = config.OutputDateFormat;
+
+		   		//dot_size_label = config.DataDotSizeName;
+
+		   		obj.yearMin = config.PeriodStart;
+		   		obj.yearMax = config.PeriodEnd;
+		   		obj.currYear = config.PeriodStart;
+		   		obj.topYear = config.PeriodStart;
+
+		   		if(config.TracerNames.trim() == "*"){ //if * then all tracers are selected and turned on
+		   			obj.tracer = true;
+		   			obj.tracerNames = ["*"];
+		   		}else if(config.TracerNames == ""){ // if string is empty then all tracers are selected but the default is tracers turned off
+		   			obj.tracer = false;
+		   			obj.tracerNames = ["*"];
+		   		}else{ // otherwise only turn on tracers specified in config file (functionality not available yet)
+		   			obj.tracer = true;
+		   			obj.tracerNames = config.TracerNames.split(", ");
+		   		}
+		   		obj.annotationShapes = config.AnnotationShapes.toUpperCase() == "ON" ? true : false;
+		   		obj.interpolate = config.Interpolate.toUpperCase() == "ON" ? true : false;
+			} 
+		})
+	} 
+};
+Globals.initialize();
+
+//ajax call to get annotation data from annotationsURL specified in config file
+$.ajax({
+	url:Globals.annotationsURL,
+	async:false,
+	dataType:'json',
+	success: function(data){
+		Globals.annotationsJson = data.Annotations;
+	}
+})
+//If no annotation file or if no annotation shapes sepcififed in annotation file, disable annotations on/off button
+if($.isEmptyObject(Globals.annotationsJson)){
+	document.getElementById("annotationsButton").disabled = true;
+}else{
+	if(!Globals.annotationsJson.SpecificAnnotations){
+		document.getElementById("annotationsButton").disabled = true;
+	}
+}
+
+var parseDate = d3.timeParse(Globals.inputDateFormat);
+var inputFileFormat = d3.timeFormat(Globals.inputDateFormat);
+var formatDate = d3.timeFormat(Globals.outputDateFormat);
+
+Globals.yearMin = new Date(parseDate(Globals.yearMin));
+Globals.yearMax = new Date(parseDate(Globals.yearMax));
+Globals.currYear = new Date(parseDate(Globals.currYear));
+Globals.topYear = new Date(parseDate(Globals.topYear));
+
+Globals.precisionInt = parsePrecisionInt(Globals.precision);
+Globals.precisionUnit = parsePrecisionUnits(Globals.precision);
+
+Globals.radiusMax = 5;
+
+
+//----------------------------------------ROW 1: TITLE/SUBTITLE -----------------------------------------
+//create a row (bootstrap) with div's for title and subtitle
+//add maintitle to index.html
+d3.select("#maintitle")
+    .append("text")
+	.text(Globals.title) //Title configured in config file
+	.style("font-size", function(){
+		return "22px";
+	});
+//add subtitle to index.html
+d3.select("#subtitle")
+    .append("text")
+	.text(Globals.subtitle) //Subtitle configured in config file
+	.style("font-size", function(){
+		return "15px";
+	});
+
+//----------------------------------ROW 2(row.viz): GAPMINDER CHART/LEGEND/LIST---------------------------
+//create an svg container for chart elements
+var svg = d3.select("#chart")
+	.append("svg")
+    .attr("class", "box")
+    .attr("width", "100%")
+    .attr("height", Globals.height) //This is the height of only the actual chart, making room for elements above and below the chart
+
+//set width to be width of svg container 'box'
+Globals.width = $(".box").width(); //Set width to the width of the chart
+
+/*create a div/svg container for legend*/
+legend = d3.select("#legend")
+	.style("height", ((Globals.height/2) - 20) + "px"); //Legend is half the height of the chart
+
+//create a div for list
+sideTools = d3.select("#sideTools")
+	.style("height", ((Globals.height/2) - 10) + "px"); //sideTools are half the height of the chart
+
+//creates the search bar for selecting provider from a dropdown menu &lt;/p>
+//utilizes [select2]{@link https://select2.github.io/} library
+$(document).ready(function() {
+  $("#providerNames").select2({
+  	placeholder: "Select Individual Dot..."
+  });
+});
+
+//-----------------------------------ROW 3: YEAR SLIDER/BUTTON CONTROLS----------------------------------
+//create a timescale for year slider
+var timeScale = d3.scaleTime()
+	.domain([Globals.yearMin, Globals.yearMax])
+	.range([0, (Globals.width - 75)]);
+
+Globals.dateArray = dateArray();
+Globals.visSpeed = 20000 / (timeScale.range()[1] - timeScale.range()[0]);
+//if the last data in the array isn't the last possible date add the last date to the end of the array
+if(Globals.dateArray[Globals.dateArray.length - 1].getTime() != Globals.yearMax.getTime()){
+	Globals.dateArray.push(Globals.yearMax);
+}
+
+var dateLabel = d3.select(".box")
+	.append("text")
+	.text(formatDate(timeScale.ticks()[0]))
+	.attr("fill-opacity", "0");
+var dateText = dateLabel.node().getBBox();
+
+//create a div and svg container for yearslider and buttons
+var controlSVG = d3.select("#dateSlider")
+    .append("svg")
+	.attr("width", "100%")
+	.attr("height", "45px")
+	.attr("transform", "translate(0,0)");
+
+var slider = controlSVG.append('g')
+	.attr('class', "slider")
+	.attr("transform", "translate(50,15)");
+
+slider.append("line")
+	.attr("class", "track")
+	.attr("x1", timeScale.range()[0])
+	.attr("x2", timeScale.range()[1])
+  .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+    .attr("class", "track-inset")
+  .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+    .attr("class", "track-overlay")
+	.call(d3.drag()
+			.on("start.interrupt", function(){slider.interrupt(); })
+			.on("start drag", function(){ draggedYear(timeScale.invert(d3.event.x)); }));
+
+var g = slider.insert("g", ".track-overlay")
+	.attr("class", "ticks")
+	.attr("transform", "translate(0," + 28 + ")");
+
+//sliderText();
+g.selectAll("text")
+	.data(timeScale.ticks(getMaxXTicks(Globals.width, dateText.width)))
+	.enter().append("text")
+	.attr("x", function(d){
+		return timeScale(d);
+	})
+	.attr("text-anchor", "middle")
+	.text(function(d){return formatDate(d); });
+
+var handle = slider.insert("circle", ".track-overlay")
+    .attr("class", "handle")
+    .attr("r", 5);
+
+var handleText = slider.insert("text", ".track-overlay")
+	.attr("font-size", "10px")
+	.text(formatDate(Globals.currYear))
+	.attr("text-anchor", "middle")
+	.attr("transform", "translate(0, -7)");
+
+/*d3.select('.ys.x.axis').selectAll('text').attr('transform', 'translate(0,-5)').style('font-size', '12px');*/
+
+//------------------------------------ROW 4: DATATABLE/ANNOTATIONS----------------------------------------
+//create a row and div for the datatable
+tablediv = d3.select("#tablediv")
+	.html(
+		"&lt;p>" + Globals.name +  ": &lt;/p>" +
+		"&lt;p>" + Globals.year + ": " + "&lt;/p>" +
+		"&lt;p>" + Globals.x_axis_label + ": &lt;/p>" +
+        "&lt;p>" + Globals.y_axis_label + ": &lt;/p>" +
+        "&lt;p>" + Globals.size + ": &lt;/p>" +
+        "&lt;p>" + Globals.dotColor + ": &lt;/p>"
+    );
+
+//if config file specifies annotationsappend a div for annotations in same row as datatable
+if(Globals.annotationsURL != ""){
+	annotations = d3.select("#annotations")
+		.style("height", "102px")
+	    .attr("transform", "translate("+ (-70) +"," + (Globals.height) + ")")
+		.html(
+			"&lt;p class='datatable' style='text-decoration:underline;'> Annotations &lt;/p>"
+		    );	
+}
+
+//create a tip object that will display information when hovering over an annotation
+var tip = d3.select('body')
+    .append('div')
+    .attr('class', 'tip')
+    .style('border', '1px solid black')
+    .style('padding', '2px')
+    .style('position', 'absolute')
+    .style('display', 'none')
+    .style('font-size', '12px')
+    .style('background', 'white')
+    .style('max-width', '200px')
+    .on('mouseover', function(d, i) {
+      tip.transition().duration(0);
+    })
+    .on('mouseout', function(d, i) {
+      tip.style('display', 'none');
+    });
+
+//Parses CSV file to JsonObj and passes that JsonObj to gapminder function
+var data = Papa.parse(Globals.CSV, {
+	header: true,
+	download: true,
+	comments: true,
+	dynamicTyping: true,
+	complete: function(results){
+	 	var jsonObj = {"data":[]};
+	  	var tempJSON = makeJsonObj(results.data[0]);
+	  	//Create Json Object
+	 	for(i = 0; i &lt; results.data.length - 1; i++){
+	      	if(results.data[i][Globals.name] == tempJSON[Globals.name]){
+	      		//parse data for data to format the chart
+	      		initializeDeminsions(results.data[i]);
+	       	 	updateJsonObj(tempJSON, results.data[i]);
+	      	}else{
+	        	jsonObj.data.push(tempJSON);
+	        	tempJSON = makeJsonObj(results.data[i]);
+	        	updateJsonObj(tempJSON, results.data[i]);
+	      	}
+	  	}
+	  	jsonObj.data.push(tempJSON);
+	  	Globals.JsonData = jsonObj;
+	  	gapminder();
+		}
+});
+
+//Certain SVG elements can only be appropriately configured
+//after data has been parsed into a json object which happens in the call to papa.parse above
+//DOM element objects configured in gapminder function but declared here for use outside of gapminder()
+var yTextBox, xTextBox;
+var radiusScale;
+var Xscale, Xaxis, xaxis, xlabel;
+var Yscale, Yaxis, yaxis, ylabel;
+var annotationLine, annotationBox, annotationShape;
+var path, line;
+var dot;
+// A bisector since many nation's data is sparsely-defined.
+var bisect = d3.bisector(function(d) { return d[0]; });
+//creates a scale to set color of dots
+var colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+function gapminder(){
+	//create invisible svg elements to determine width of axis labels used for purposes of configuring and resizing the chart
+	//create svg element of largest y-axis label
+	//TODO: Maybe come up with a more clever way of getting this information
+	//Justin Rentie - July 14, 2017
+	var yText = d3.select(".box")
+		.append("text")
+		.text(d3.format(",.0f")(Math.round(Globals.yMax))) //hard-coded, needs to change
+		.attr("fill-opacity", 0);
+	//create svg element of largest x-axis label
+	var xText = d3.select(".box")
+		.append("g")
+		.append("text")
+		.text(d3.format(",.0f")(Math.round(Globals.xMax))) //hard-coded, needs to change
+		.attr("fill-opacity", 0);
+	//bbox gets height and width attributes of labels
+	yTextBox = yText.node().getBBox();
+	xTextBox = xText.node().getBBox();
+
+	//creates a scale to set radius of dots											
+	radiusScale = d3.scaleSqrt().domain([0, (Globals.radiusMax * 2)]).range([3, 47]);
+	//assign xScale according to if config file specifies Log or Linear
+	if(Globals.x_axis_type.toUpperCase() == "LOG"){
+		//configure the log x scale domain and range
+		xScale = d3.scaleLog()
+			.domain([checkLogMin(Globals.xMin), Globals.xMax + 100]) //checkLogMin to make sure no negative #s
+			.range([yTextBox.width + Globals.margin.left + 15, (Globals.width-25)]);
+		//configure the xAxis with the xScale.
+		xAxis = d3.axisBottom()
+			.scale(xScale)
+			.ticks(6, d3.format(",d")) //get logTicks for log &amp; format numbers for log
+			.tickSizeInner(-(Globals.height))
+			.tickSizeOuter(0)
+			.tickPadding(10);
+	}else{ 
+		//configure the linear x scale domain and range
+		xScale = d3.scaleLinear()
+			.domain([Globals.xMin, Globals.xMax + 100])
+			.range([yTextBox.width + Globals.margin.left + 15, (Globals.width-25)]);
+		//configure the xAxis using the xScale.
+		xAxis = d3.axisBottom()
+			.scale(xScale)
+			.ticks(getMaxXTicks(Globals.width, xTextBox.width) - 1) //get maxXTicks for linear
+			.tickFormat(d3.format(",d")) //format numbers for linear
+			.tickSizeInner(-(Globals.height))
+			.tickSizeOuter(0)
+			.tickPadding(10);
+	}
+	//assign xScale according to if config file specifies Log or Linear
+	if(Globals.y_axis_type.toUpperCase() == "LOG"){
+		//configure log y scale domain and range
+		yScale = d3.scaleLog()
+			.domain([checkLogMin(Globals.yMin), Globals.yMax]) //checkLogMin to make sure no negative #s
+			.range([Globals.height - 40, 0]);
+		//configure yAxis using y scale
+		yAxis = d3.axisLeft()
+			.scale(yScale)
+			.ticks(6, d3.format(",d")) //get logTicks for log &amp; format numbers for log
+			.tickSizeInner(-(Globals.width - Globals.margin.right))
+			.tickSizeOuter(0)
+			.tickPadding(10);
+	}else{
+		//configure linear y scale domain and range
+		yScale = d3.scaleLinear()
+		    .domain([Globals.yMin, Globals.yMax])
+		    .range([Globals.height - 40, 0]);
+		//configure yAxis using y scale
+		yAxis = d3.axisLeft()
+			.scale(yScale)
+			.ticks(getMaxYTicks(Globals.height, yTextBox.height)) //get maxYticks for linear
+			.tickFormat(d3.format(",")) //format numbers for linear
+			.tickSizeInner(-(Globals.width - Globals.margin.right))
+			.tickSizeOuter(0)
+			.tickPadding(10);
+	}
+
+	//-------------------------------------GAPMINDER CHART-------------------------------------
+	//add the x-axis to svg, using xAxis
+	xaxis = svg.append("g")
+	    .attr("class", "x axis")
+	    .attr("transform", "translate(0," + (Globals.height - 40) + ")")
+	    .call(xAxis);
+	//add the y-axis to svg, using yAxis
+	yaxis = svg.append("g")
+	    .attr("class", "y axis")
+	    .call(yAxis)
+	    .attr("transform", "translate(" + (yTextBox.width + Globals.margin.left + 15)  + ",0)");
+	//add an x-axis label to below x-axis
+	xlabel = svg.append("text")
+	    .attr("class", "xLabel")
+	    .attr("text-anchor", "middle")
+	    .attr("x", (Globals.width/2))
+	    .attr("y", Globals.height - 5)
+	    .text(Globals.x_axis_label)
+	    .attr("font-size", "14px");
+	//add a y-axis label to svg to left of y-axis
+	ylabel = svg.append("text")
+	    .attr("class", "yLabel")
+	    .attr("text-anchor", "middle")
+	    .attr("y", 0)
+	    .attr("x", -((Globals.height - 100)/2))
+	    .attr("dy", ".75em")
+	    .attr("transform", "rotate(-90)")
+	    .text(Globals.y_axis_label)
+	    .attr("font-size", "14px");
+
+	//initialize position 0 for adding elements to legend div.
+	var pos = 0;
+	//get list of names for legend based off how dots are colored/grouped on the visualization
+	legendData = getGroupingNames(Globals.JsonData);
+	//set height using 20px per name
+	legendHeight = (legendData.length + 1) * 20;
+
+	d3.select("#legend")
+		.style("height", function(){
+			if(legendHeight &lt; ((Globals.height/2) - 20)){
+				return legendHeight + "px";
+			}else{
+				return (Globals.height/2) - 20 + "px";
+			}
+		});
+	//append svg to legend div using legendHeight
+	legend = legend.append('svg')
+		.attr("class", "legendBox")
+		.attr("width", "100%")
+		.attr("height", legendHeight)
+	//add legend title
+	legend.append('text')
+		.text(Globals.dotColor)
+		.style("font-size", "12px")
+		.style("text-decoration", "underline")
+		.attr("y", "10");
+	//add square for each name, color coordinated with colorScale
+	square = legend.append("g")
+		.attr("class", "square")
+		.selectAll(".square")
+		.data(legendData)
+	  .enter().append("rect")
+	    .attr("class", "square")
+	    .attr("height", "10px")
+	    .attr("width", "10px")
+	    .attr("y", function(d){ return pos+=20; })
+	    .style("fill", function(d){
+	    		return colorScale(d);
+	    })
+	    .attr("cursor", "pointer")
+	    .on("mousedown", legendButton); //callback function: legendButton()
+	//reset position for legend div, accounting for text positioning vs. svg rect positioning
+	pos = 7;
+	//add the text to the legend from list of names
+	legendText = legend.append("g")
+		.attr("class", "legendText")
+		.selectAll("legendText")
+		.data(legendData)
+	   .enter().append("text")
+	    .text(function(d){
+	    	s = " - " + d;
+	    	if(s.length > 17){
+	    		s = s.substring(0,17); //truncate name if too long to fit inside svg
+	    		s += "...";
+	    	}
+	    	return s;
+	    })
+	    .style("font-size", "12px")
+	    .attr("x","15px")
+	    .attr("y", function(d){
+	    	return pos+=20;
+	    })
+	    .attr("cursor", "pointer")
+	    .on("mousedown", legendButton); //callback function: legendButton()
+
+	//get list of names for dropdown list
+	names = getIndividualDots(Globals.JsonData);
+	d3.select("#providerNames")
+		.selectAll(".options")
+		.data(names)
+		.enter().append("option")
+		.attr("value", function(d){
+			return d;
+		})
+		.text(function(d){
+			/*s = d; //possiblity to also truncate names in dropdown list
+	    	if(s.length > 20){
+	    		s = s.substring(0,17);
+	    		s += "...";
+	    	}*/
+	    	return d;
+		})
+		.style('font-size', '12px');
+
+	//create line for data line (tracer)
+	line = d3.line()
+		.x(function(d) {return xScale(x(d));})
+		.y(function(d) {return yScale(y(d));})
+
+	//-------------------------Add different elements to DOM if specified in annotation file----------------------
+	if(!$.isEmptyObject(Globals.annotationsJson.SpecificAnnotations)){
+		annotationShapes = svg.append("g")
+			.attr("id", "annotationShapes");
+		//Add line Annoations if they are sepcified in the annotation file
+		var lineAnnotations = retrieveAnnotations("Line");
+		if(lineAnnotations){
+			annotationLine = annotationShapes.selectAll(".line")
+				.data(lineAnnotations.values)
+				.enter().append("line")
+				.attr("id", "annotationLine")
+				.attr("class", "annotationShape")
+				.attr('x1', function(d){
+					return xScale(d.Properties.x1);
+				})
+				.attr('y1', function(d){
+					return yScale(d.Properties.y1 + 5);
+				})
+				.attr('x2', function(d){
+					return xScale(d.Properties.x2);
+				})
+				.attr('y2', function(d){
+					return yScale(d.Properties.y2);
+				})
+				.attr('stroke-width', function(d){
+					return d.Properties.LineWidth + "px";
+				})
+				.attr('stroke', 'black')
+				.on('mouseover', mouseoverAnnotation)
+				.on('mouseout', function(d, i){
+					tip.transition()
+				        .style('display', 'none');
+				});
+		}
+		//Add a rectangle if specified in the annotation file
+		var rectAnnotations = retrieveAnnotations("Rectangle");
+		if(rectAnnotations){
+			annotationRect = annotationShapes.selectAll(".rect")
+				.data(rectAnnotations.values)
+				.enter().append("rect")
+				.attr("id", "annotationRect")
+				.attr("class", "annotationShape")
+				.attr('x', function(d){
+					return xScale(d.Properties.x1);
+				})
+				.attr('y', function(d){
+					return yScale(d.Properties.y1);
+				})
+				.attr('width', function(d){
+					var x1 = xScale(d.Properties.x1);
+					var x2 = xScale(d.Properties.x2);
+					return x2 - x1;
+				})
+				.attr('height', function(d){
+					var y1 = yScale(d.Properties.y1);
+					var y2 = yScale(d.Properties.y2);
+					return y2 - y1;
+				})
+				.attr('fill-opacity', 0)
+				.attr('stroke-width', function(d){
+					return d.Properties.LineWidth + "px";
+				})
+				.attr('stroke', 'black')
+				.on('mouseover', mouseoverAnnotation)
+				.on('mouseout', function(d, i){
+					tip.transition()
+				        .style('display', 'none');
+				});
+		}
+		//Add a symbol if specified in the annotation file
+		//Add circles from annotation file
+		var symbolAnnotations = retrieveAnnotations("Symbol");
+		if(symbolAnnotations){
+			var circleAnnotations = retrieveByShape("Circle");
+			if(circleAnnotations){
+				annotationCircle = svg.append("g")
+					.selectAll(".point")
+					.data(circleAnnotations.values)
+					.enter().append("path")
+					.attr("id", "annotationCircle")
+					.attr("class", "point annotationShape")
+					.attr("d", d3.symbol().type(d3.symbolCircle).size(function(d){
+						return Math.pow(d.Properties.SymbolSize, 2);
+					}))
+					.attr("transform", function(d){ 
+						return "translate(" + xScale(d.Properties.x) + "," + yScale(d.Properties.y) + ")";
+					})
+					.attr("stroke-width", "2px")
+					.attr('stroke', 'black')
+					.attr('fill-opacity', 0)
+					.on('mouseover', mouseoverAnnotation)
+					.on('mouseout', function(d, i){
+						tip.transition()
+					        .style('display', 'none');
+					});
+			}
+			//Add Triangles from annotation file
+			var triangleAnnotations = retrieveByShape("Triangle");
+			if(triangleAnnotations){
+				annotationTriangle = svg.append("g")
+					.selectAll(".point")
+					.data(triangleAnnotations.values)
+					.enter().append("path")
+					.attr("id", "annotationTriangle")
+					.attr("class", "point annotationShape")
+					.attr("d", d3.symbol().type(d3.symbolTriangle).size(function(d){
+						return Math.pow(d.Properties.SymbolSize, 2);
+					}))
+					.attr("transform", function(d){ 
+						return "translate(" + xScale(d.Properties.x) + "," + yScale(d.Properties.y) + ")";
+					})
+					.attr("stroke-width", "2px")
+					.attr('stroke', 'black')
+					.attr('fill-opacity', 0)
+					.on('mouseover', mouseoverAnnotation)
+					.on('mouseout', function(d, i){
+						tip.transition()
+					        .style('display', 'none');
+					});
+			}
+			//Add Crosses from annotation file
+			var crossAnnotations = retrieveByShape("Cross");
+			if(crossAnnotations){
+				annotationCross = svg.append("g")
+					.selectAll(".point")
+					.data(crossAnnotations.values)
+					.enter().append("path")
+					.attr("id", "annotationCross")
+					.attr("class", "point annotationShape")
+					.attr("d", d3.symbol().type(d3.symbolCross).size(function(d){
+						return Math.pow(d.Properties.SymbolSize, 2);
+					}))
+					.attr("transform", function(d){ 
+						return "translate(" + xScale(d.Properties.x) + "," + yScale(d.Properties.y) + ")rotate(45)";
+					})
+					.attr("stroke-width", "2px")
+					.attr('stroke', 'black')
+					.attr('fill-opacity', 0)
+					.on('mouseover', mouseoverAnnotation)
+					.on('mouseout', function(d, i){
+						tip.transition()
+					        .style('display', 'none');
+					});
+			}
+			//Add Text from annotation file
+			var textAnnotations = retrieveAnnotations("Text");
+			if(textAnnotations){
+				annotationText = svg.append("g")
+					.selectAll(".text")
+					.data(textAnnotations.values)
+					.enter().append("text")
+					.attr("id", "annotationText")
+					.attr("class", "annotationShape")
+					.text(function(d){
+						return d.Properties.Text;
+					})
+					.attr("text-anchor", "middle")
+					.attr("x", function(d){
+						return xScale(d.Properties.x);
+					})
+					.attr("y", function(d){
+						return yScale(d.Properties.y) + 5;
+					})
+					.attr("font-size", function(d){
+						return d.Properties.FontSize;
+					})
+					.on('mouseover', mouseoverAnnotation)
+					.on('mouseout', function(d, i){
+						tip.transition()
+					        .style('display', 'none');
+					})
+					.attr("cursor", "default");
+			}
+		}
+	}
+	//Turn annotations off if specified 'Off' in config file
+	if(!Globals.annotationShapes){
+		if($("#annotationText").length){
+			annotationText.attr("fill-opacity", 0).on("mouseover", null);
+		}
+		d3.selectAll(".annotationShape").attr("stroke-opacity", 0).on("mouseover", null);
+		document.getElementById("annotationsButton").innerHTML = "Turn Annotations On";
+	}
+
+	//Add tracers to the dots on the visualization
+	pathData = [];
+	if(Globals.tracerNames != "*"){
+		Globals.pathJSON = specificPathData(Globals.JsonData.data);
+	}else{
+		Globals.pathJSON = Globals.JsonData.data;
+	}
+	var nested = nest(interpolatePath(Globals.yearMin), pathData);
+	path = svg.append("g")
+		.attr("id", "dataline")
+		.selectAll(".path")
+		.data(nested)
+		.enter().append("path")
+		.attr("class", function(d){
+			return "tracer " + d.key;
+		})
+		.attr("id", function(d){
+			return d.values[0].color.id();
+		})
+		.style("stroke", function(d){
+			return colorScale(d.values[0].color);
+		})
+		.style("stroke-width", "1.5px")
+		.style("stroke-opacity", function(d){
+			if(Globals.tracer){
+				return .75;
+			}else{
+				return 0;
+			}
+		})
+		.attr("d", function(d){
+			return line(d.values);
+		});
+	//Turn tracers off if specified 'Off' in config file
+	if(!Globals.tracer){
+		document.getElementById("tracerButton").innerHTML = "Turn Tracer On";
+	}
+
+	//Finally add dots to visualization from interpolated data
+	dot = svg.append("g")
+	    .attr("id", "dots")
+	  .selectAll(".dot")
+	    .data(interpolateData(Globals.yearMin))
+	  .enter().append("circle")
+	    .attr("class", function(d){
+	    	return "dot " + d.color; 
+	    })
+	    .attr("id", function(d, i){
+	    	return d.name.id();
+	    })
+	    .on("mouseover", mouseover) //mouseover callback function 
+	    .on('mouseout', mouseout) //mouseout callback function
+	    .on("mousedown", mousedown) //mousedown callback function
+	    //color according to grouping variable
+	    .style("fill", function(d) {return colorScale(color(d)); })
+	    .attr("display", "true")
+	    .call(position) //positon callback
+	    //sets smaller dots on top
+	    .sort(order); //order callback
+}
+
+//---------------Various accessors that specify the four dimensions of data to visualize.-------------------
+
+/**
+ *Accessor function for x-variable
+ */
+function x(d) { return d.xVar; }
+/**
+ *Accessor function for y-variable
+ */
+function y(d) { return d.yVar; }
+/**
+ *Accessor function for size of dot
+ */
+function radius(d) { return d.size; }
+/**
+ *Accessor function for color of dot
+ */
+function color(d) {return d.color; }
+/**
+ *Accessor function for name of dot
+ */
+function key(d) { return d.name; }
+/**
+ *Accessor function for date
+ */
+function date(d){ return d.year; }
+
+//----------------------Functions used to convert data from csv format to json object---------------------
+
+/**
+ *Makes a JSON object in the correct format required for interpolating the data &lt;/p>
+ *ex: {"WaterUse_AFY":[],"GPCD":[],"Population":[],"Basin":"Metro","Provider":"Arapahoe County Water and Wastewater Authority"}
+ *
+ *@param {object} data - an object containing data from csv file
+ */
+function makeJsonObj(data){
+	json = {}
+	json[Globals.xVar] = [];
+	json[Globals.yVar] = [];
+	json[Globals.size] = [];
+	json[Globals.dotColor] = data[Globals.dotColor];
+	json[Globals.name] = data[Globals.name];
+	return json;
+}
+
+/**
+ *Returns an object containing 3 new 2 element arrays of [year, data] &lt;/p>
+ *ex: {xVar:[year, var1], yVar:[year, var2], size:[year, var3]}
+ *
+ *@param {int} year - year for which to create the arrays
+ *@param {number} var1 - data for xVar
+ *@param {number} var2 - data for yVar
+ *@param {number} var3 - data for size
+ */ 
+function createNewObject(date, var1, var2, var3){
+	date = new Date(parseDate(date));
+	var data = {
+		 xVar:[date, var1],
+		 yVar:[date, var2],
+		size:[date, var3]
+	 };
+	return data;
+}
+
+/**
+ *Checks that data is always slightly larger than 0 for logarithmic scaling purposes
+ *
+ *@param {number} data - a number to be checked
+ */
+function checkData(data){
+	if(data == 0){
+		return 0.001;
+	}else{
+		return 0;
+	}
+}
+
+/**
+ *Pushes data returned from createNewObj() onto the JSON object
+ *
+ *@param {object} JSON - the JSON object to be udpated
+ *@param {object} data - object containing data to be added to JSON object
+ */
+function updateJsonObj(JSON, data){
+	data = createNewObject(data[Globals.year], data[Globals.xVar], data[Globals.yVar], data[Globals.size]);
+	JSON[Globals.xVar].push(data.xVar);
+	JSON[Globals.yVar].push(data.yVar);
+	JSON[Globals.size].push(data.size);
+}
+
+/**
+ *Initializes variables for min and max values while parsing through the csv data file &lt;/p>
+ *ex: xMin, xMax, yMin, yMax, and radiusMax
+ *
+ *@param {object} data - object containing data
+ */
+function initializeDeminsions(data){
+	Globals.xMin = Math.min(Globals.xMin, data[Globals.xVar]);
+	Globals.xMax = Math.max(Globals.xMax, data[Globals.xVar]);
+	Globals.yMin = Math.min(Globals.yMin, data[Globals.yVar]);
+	Globals.yMax = Math.max(Globals.yMax, data[Globals.yVar]);
+	Globals.radiusMax = Math.max(Globals.radiusMax, data[Globals.size]);
+}
+
+/**
+ *Update all path data with new information
+ *
+ *@param {array} newData - an array of updated data
+ */
+function updatePath(newData){
+	d3.select("#dataline").selectAll("path")
+		.data(newData) //update path with newData
+		.attr("d", function(d){
+			return line(d.values);
+		});
+}
+
+//--------------------------------------Callback functions for dots------------------------------------------
+
+/**
+ *Callback function: Called when user clicks on a dot &lt;/p>
+ *Highlights selected dot with a yellow outline
+ */
+function mousedown(d, i){
+	if(d3.select(this).attr("display") == "true"){
+		if(d3.select(this).attr("checked") == "true"){
+			d3.select(this)
+				.style('stroke', 'black')
+		 		.attr('stroke-width', '1px')
+		 		.attr('stroke-opacity', 1)
+		 		.attr("checked", "false");
+		}else{
+			d3.select(this)
+				.style('stroke', 'yellow')
+		 		.attr('stroke-width', function(){
+		 			if(d3.select(this).attr("display") == "true"){
+		 				return 4;
+		 			}else{
+		 				return 0;
+		 			}
+		 		})
+		 		.attr('stroke-opacity', .5)
+		 		.attr("checked", "true");
+	 	}
+	}else{}
+}
+
+/**
+ *Callbcak Function: Called when user hovers over dot with the mouse &lt;/p>
+ *Displays data information associated with dot on mouseover,
+ *and creates a bold outline (stroke) around the selected dot
+ */
+function mouseover(d, i){
+	//dot outline thicker on mouseover
+	if(d3.select(this).attr("display") == "true"){
+		if(Globals.displayAll){
+			d3.selectAll(".dot").style("fill-opacity", .75).attr("stroke-opacity", .5);
+		}else{
+			d3.selectAll(".dot" + d.color.classSelector()).style("fill-opacity", .75).attr("stroke-opacity", .5);
+		}
+		
+		d3.select(this)
+			.style("fill-opacity", 1)
+			.attr('stroke-opacity', function(){
+				if(d3.select(this).attr("checked") != "true"){return 1;}
+				else{return .5;}
+			})
+			.attr('stroke-width',function(){
+				if(d3.select(this).attr("checked") != "true"){return 2;}
+				else{return 5;}
+			});
+		d3.select(this).moveToFront();
+
+		if(Globals.tracer){
+			if(Globals.displayAll){
+				d3.selectAll("path.tracer").style("stroke-opacity", .4);
+			}else{
+				d3.selectAll("path" + d.color.idSelector()).style("stroke-opacity", .4);
+			}
+			//display only the tracer that is being hovered over
+			d3.select("path" + d.name.classSelector())
+				.style("stroke-opacity", 1);
+		}
+	}
+
+	//display information in data table if config file specifies datatable
+	tablediv.html(
+		"&lt;p>" + Globals.name +  ": " + key(d) + "&lt;/p>" +
+		"&lt;p>" + Globals.year + ": " + formatDate(getClosest(date(d))) + "&lt;/p>" +
+		"&lt;p>" + Globals.x_axis_label + ": " + d3.format(",d")(Math.round(d.xVarRaw)) + "&lt;/p>" +
+	    "&lt;p>" + Globals.y_axis_label + ": " + (d.yVarRaw.toFixed(2)) + "&lt;/p>" +
+	    "&lt;p>" + Globals.size + ": " + d3.format(",d")(Math.round(d.sizeRaw)) + "&lt;/p>" +
+	    "&lt;p>" + Globals.dotColor + ": " + color(d) + "&lt;/p>"
+	);
+}
+
+/**
+*Callback Function: Called when user moves mouse away from a dot &lt;/p>
+*Removes the bolded outline (stroke) around the dot
+*/
+function mouseout(d){
+	//remove thick dot outline on mouseout
+	if(d3.select(this).attr("display") == "true"){
+		if(Globals.displayAll){
+			d3.selectAll(".dot").style("fill-opacity", 1).attr("stroke-opacity", function(){
+				if(d3.select(this).attr("checked") != "true"){return 1;}
+				else{return .5;}
+			});
+		}else{
+			d3.selectAll(".dot" + d.color.classSelector()).style("fill-opacity",1).attr("stroke-opacity",function(){
+				if(d3.select(this).attr("checked") != "true"){return 1;}
+				else{return .5;}
+			});
+		}
+
+		d3.select(this)
+		  .attr('stroke-width',function(){
+		  		if(d3.select(this).attr("checked") != "true"){return 1;}
+				else{return 4;}
+		  });
+
+		if(Globals.tracer){
+			if(Globals.displayAll){
+				d3.selectAll("path.tracer").style("stroke-opacity", .75);
+			}else{
+				d3.selectAll("path" + d.color.idSelector()).style("stroke-opacity", .75);
+			}
+		}
+	}
+}
+
+//-----------------------------------Other Callback Functions for various elements----------------------------------
+/**
+ *Callback Function: Called when clicking and dragging the year slider &lt;/p>
+ *Pauses animation and calls display year to display data associated with selected date
+ *
+ *@param {number} year - date selected from year slider
+ */ 
+function draggedYear(date) {
+	if(date >= Globals.yearMin &amp;&amp; date &lt; Globals.yearMax){
+		stopAnimation();
+		document.getElementById("pause").disabled = true;
+		document.getElementById("play").disabled = false;
+		displayYear(date);
+	}
+}
+
+/**
+ *Callback Function: Called when clicking on a selection (basin) on the legend &lt;/p>
+ *Displays only dots related to that specific label
+ */
+function legendButton(d){
+	Globals.displayAll = false;
+	selectedGroup = d;
+	d3.selectAll("path.tracer").style("stroke-opacity", 0)
+	d3.selectAll(".dot").style("fill-opacity", ".2").attr("stroke-width", "0").attr("display", "false")
+	setTimeout(function(){
+		d3.selectAll(d.classSelector()).style("fill-opacity", "1").attr("stroke-width", function(){
+			if(d3.select(this).attr("checked") != "true"){
+				return 1;
+			}else{
+				return 4;
+			}
+		}).attr("display", "true");
+		if(Globals.tracer){
+			d3.selectAll("path" + d.idSelector()).style("stroke-opacity", .75);
+		}
+	}, 100);
+}
+
+/**
+ *Callback Function: Called when clicking on Select All button &lt;/p>
+ *Displays all dots
+ */
+function selectAllButton(){
+	Globals.displayAll = true;
+	d3.selectAll(".dot").style("fill-opacity", "1").attr("stroke-width", function(){
+		if(d3.select(this).attr("checked") != "true"){
+			return 1;
+		}else{
+			return 4;
+		}
+	}).attr("display", "true");
+	dot.sort(order);
+	if(Globals.tracer){
+		d3.selectAll("path.tracer").style("stroke-opacity", .75);
+	}
+}
+
+/**
+ *Callback Function: Called when clicking Turn Tracer On/ Turn Tracer Off &lt;/p>
+ *Either displays all tracers or turns them all off
+ */
+function tracerButton(){
+	var elem = document.getElementById("tracerButton");
+	if(elem.innerHTML == "Turn Tracer On"){
+		//turn on display for all tracers
+		if(Globals.displayAll){
+			d3.selectAll("path.tracer").style("stroke-opacity", .75);
+		}else{
+			d3.selectAll("path" + selectedGroup.idSelector()).style("stroke-opacity", .75);
+		}
+		Globals.tracer = true;
+		elem.innerHTML = "Turn Tracer Off";
+	}else{
+		//turn off display for tracers
+		d3.selectAll("path.tracer").style("stroke-opacity", 0);
+		Globals.tracer = false;
+		elem.innerHTML = "Turn Tracer On";
+	}
+}
+
+/**
+ *Callback Function: Called when clicking Turn Annotations On/ Turn Annotations Off &lt;/p>
+ *Either displays the annotation shapes on the canvas or hides them
+ */
+function annotationsButton(){
+	var elem = document.getElementById("annotationsButton");
+	if(elem.innerHTML == "Turn Annotations On"){
+		if($("annotationText").length){annotationText.attr("fill-opacity", 1).on("mouseover", mouseoverAnnotation);}
+		d3.selectAll(".annotationShape").attr("stroke-opacity", 1).on("mouseover", mouseoverAnnotation);
+		elem.innerHTML = "Turn Annotations Off";
+	}else{
+		if($("annotationText").length){annotationText.attr("fill-opacity", 0).on("mouseover", null);}
+		d3.selectAll(".annotationShape").attr("stroke-opacity", 0).on("mouseover", null);
+		elem.innerHTML = "Turn Annotations On";
+	}
+}
+
+/**
+ *Callback Function: Called when user mouse's over an annotation shape on the canvas &lt;/p>
+ *Displays a tooltip with the annotation information at mouseover event
+ */
+function mouseoverAnnotation(d){
+	tip.transition().duration(0);
+	tip.style('top', (d3.event.pageY - 20) + 'px')
+		.style('left', (d3.event.pageX + 13) + 'px')
+		.style('display', 'block')
+		.html(d.Annotation);
+}
+
+/**
+ *Callback Function: Called when clicking on play button &lt;/p>
+ *Starts the animation &lt;/p>
+ *Disables play button &lt;/p>
+ *Enables pause button 
+ */
+function playButton(){
+	playAnimation();
+	document.getElementById("play").disabled = true;
+	document.getElementById("pause").disabled = false;
+}
+
+/**
+ *Callback Function: Called when clicking on pause button &lt;/p>
+ *Pauses the animation &lt;/p>
+ *Disables pause button &lt;/p>
+ *Enables play button 
+ */
+function pauseButton(){
+	stopAnimation();
+	document.getElementById("pause").disabled = true;
+	document.getElementById("play").disabled = false;
+}
+
+/**
+ *Callback Function: Called when clicking on replay button &lt;/p>
+ *Restarts the animation from Globals.yearMin &lt;/p>
+ *Disables play button &lt;/p>
+ *Enables pause button 
+ */
+function replayButton(){
+	stopAnimation();
+	document.getElementById("play").disabled = true;
+	document.getElementById("pause").disabled = false;
+	end = false;
+	setTimeout(function(){
+		replay()
+	}, 100);
+}
+
+/**
+ *Called inside replayButton() &lt;/p>
+ *Called seperately to create a synchronous ordering of things,
+ * this way the global variables are properly configured before starting the animation agian.
+ */
+function replay(){
+	pathData = [];
+	updatePath(nest(interpolatePath(Globals.yearMin), pathData));
+	Globals.topYear = Globals.yearMin;
+	Globals.currYear = Globals.yearMin;
+	playAnimation();
+}
+
+/**
+ *Callback Function: Called when clicking on back button &lt;/p>
+ *Displays the animation one year/date back &lt;/p>
+ *Disables pause button &lt;/p>
+ *Enables play button
+ */
+function backButton(){
+	Globals.currYear = roundDate(Globals.currYear);
+	decrementDate(Globals.currYear);
+	document.getElementById("pause").disabled = true;
+	document.getElementById("play").disabled = false;
+	if(Globals.currYear >= Globals.yearMin){
+		stopAnimation();
+		setTimeout(function(){
+			displayYear(Globals.currYear);
+		}, 100);
+	}else{
+		displayYear(Globals.yearMin);
+	}
+}
+
+/**
+ *Callback Function: Called when clicking on the forward button &lt;/p>
+ *Displays the animation one year/date forward &lt;/p>
+ *Disables pause button &lt;/p>
+ *Enables play button
+ */
+function forwardButton(){
+	Globals.currYear = roundDate(Globals.currYear);
+	incrementDate(Globals.currYear);
+	document.getElementById("pause").disabled = true;
+	document.getElementById("play").disabled = false;
+	if(Globals.currYear &lt;= Globals.yearMax){
+		stopAnimation();
+		setTimeout(function(){
+			displayYear(Globals.currYear);
+		}, 100);
+	}else{
+		displayYear(Globals.yearMax);
+	}
+}
+
+/**
+ *Jquery event listener for when selecting a provider from the dropdown menu &lt;/p>
+ *Highlights the selected provider with a yellow outline &lt;/p>
+ *Utilizes [select2]{@link https://select2.github.io/} library
+ */
+$('select').on('select2:select', function(evt){
+	provider = evt.params.data.text;
+	console.log(provider);
+	console.log(provider.idSelector());
+	d3.select(provider.idSelector())
+		.style('stroke', 'yellow')
+ 		.attr('stroke-width', function(){
+ 			if(d3.select(this).attr("display") == "true"){
+ 				return 4;
+ 			}else{
+ 				return 0;
+ 			}
+ 		})
+ 		.attr('stroke-opacity', .5)
+ 		.attr("checked", "true");
+});
+
+/**
+ *Jquery event listener for when de-selecting a provider from the dropdown menu &lt;/p>
+ *Removes the highlighted outline from the de-selected dot &lt;/p>
+ *Utilizes [select2]{@link https://select2.github.io/} library
+ */
+$('select').on('select2:unselect', function(evt){
+	provider = evt.params.data.text;
+	var checkedNames = $("#providerNames").val();
+	var length = $("#providerNames").val().length;
+	d3.select(provider.idSelector())
+		.style('stroke', null)
+ 		.attr('stroke-width', 1)
+ 		.attr('stroke-opacity', function(){
+ 			if(d3.select(this).attr("display") == "true"){
+ 				return 1;
+ 			}else{
+ 				return 0;
+ 			}
+ 		})
+ 		.attr("checked", "false");
+})
+
+//-------------------------------Functions for Running the animation from the visualization----------------------------------\
+/**
+ *Function which plays the animation starting from Globals.currYear to Globals.yearMax
+ */
+function playAnimation(){
+	//start transition
+	Globals.transition = svg.transition()
+		.duration(getTimeInterpolate(Globals.currYear, Globals.yearMax)) //call getTimeInterpolate to calculate amount of time between years transition
+		.ease(d3.easeLinear)
+		.tween("year", tweenYear) //tweenYear callback function
+		.on("end", function(){end = true;});
+}
+
+/**
+ *Resets the speed of the visualization when moving the speed slider
+ *
+ *@param {number} value - a value from speed slider from 0 - 100
+ */
+function setSpeed(value){
+	var speedScale = d3.scaleLinear()
+		.domain([100, 0])
+		.range([10000, 100000]);
+
+	var mill = speedScale(value);
+	var len = timeScale.range()[1] - timeScale.range()[0];
+	Globals.visSpeed = mill / len;
+	if(document.getElementById("play").disabled == true){
+		stopAnimation();
+		playAnimation();
+	}
+}
+
+/**
+ *Function which pauses the animation
+ */
+function stopAnimation(){
+	transition = true;
+	svg.transition() //pause transition
+		.duration(0);
+}
+
+
+/**
+ *postitions the dots on the screen and sets the dots radius based off data for current year
+ *
+ *@param {object} dot - the svg element 'dot' that gets positioned
+ */
+function position(dot) {
+	dot .attr("cx", function(d) { return xScale(x(d)); })
+	    .attr("cy", function(d) { return yScale(y(d)); })
+	    .attr("r", function(d) { return minRadius(radiusScale(radius(d))); });
+}
+
+/**
+ *Ensures smallest dots are above larger dots
+ *
+ *@param {object} a - the svg dot to check against
+ *@param {object} b - the svg dot to check against
+ */
+function order(a, b) {
+	return radius(b) - radius(a);
+}
+
+/**
+ *Interpolates through years currYear - yearMax and calls display year on each year value
+ */
+function tweenYear() {
+	var interpolateDate = d3.interpolateDate(Globals.currYear, Globals.yearMax);
+	return function(t) { 
+		if(t == 1){
+			transition = true;
+		}
+		displayYear(interpolateDate(t));
+	};
+}
+
+/**
+ *Displays animation for data of specified year
+ * 
+ *@param {number} year - year to display data for
+ */
+function displayYear(date) {
+	//display annotations
+	if(Globals.annotationsURL != ""){
+		if(getAnnotations(formatDate(date))){
+			d = getAnnotations(formatDate(date));
+			annotations.html(
+				"&lt;p class='datatable' style='text-decoration:underline;'> Annotations &lt;/p>" +
+				"&lt;p class='datatable' style='font-weight:bold;'> Date: " + inputFileFormat(date) + "&lt;/p>" + 
+				"&lt;p class='datatable' style='font-weight:bold; display:inline;'>" + d.Title + ": " +
+				"&lt;p class='datatable'style='display:inline;'>" + d.Description + "&lt;/p>"
+			)
+		}
+	}
+	dot.data(interpolateData(date), key).call(position)
+	if(Globals.displayAll == true){
+		dot.sort(order);
+	}
+    handle.attr("transform", "translate(" + (timeScale(getClosest(date)) + ",0)"));
+    handle.select('text').text(Math.round(date));
+    handleText.text(formatDate(getClosest(date))).attr("transform", "translate(0" + (timeScale(getClosest(date)) + ", -7)"));
+    if(date >= Globals.topYear){
+    	updatePath(nest(interpolatePath(date), pathData));
+    }
+   	if(date > Globals.topYear){
+   		Globals.topYear = date;
+   	}
+    Globals.currYear = new Date(date);
+}
+
+/**
+ *Returns an object containing one interpolated data point for the current year
+ *
+ *@param {number} year - current year to get data for
+ */
+function interpolatePath(year) {
+    return Globals.pathJSON.map(function(d) {
+      //document.write(d[var3]);
+      return {
+        //X-Axis
+        xVar: interpolateValues(d[Globals.xVar], year),
+        //Y-Axis
+        yVar: interpolateValues(d[Globals.yVar], year),
+        //Size of Dot
+        size: interpolateValues(d[Globals.size], year),
+        //Color of Dot
+        color: d[Globals.dotColor],
+        //Name
+        name: d[Globals.name],
+        //year
+        year: year
+      };
+    });
+}
+
+// Interpolates the dataset for the given (fractional) year.
+/**
+ *Returns an object containing one interpolated data point for the current year
+ *
+ *@param {number} year - current year to get data for
+ */
+function interpolateData(year) {
+    return Globals.JsonData.data.map(function(d) {
+      return {
+        //X-Axis
+        xVar: interpolateValues(d[Globals.xVar], year),
+        //Y-Axis
+        yVar: interpolateValues(d[Globals.yVar], year),
+        //Size of Dot
+        size: interpolateValues(d[Globals.size], year),
+        //original data, uninterpolated
+        xVarRaw: interpolateValues(d[Globals.xVar], getClosest(year)),
+        yVarRaw: interpolateValues(d[Globals.yVar], getClosest(year)),
+        sizeRaw: interpolateValues(d[Globals.size], getClosest(year)),
+        //Color of Dot
+        color: d[Globals.dotColor],
+        //Name
+        name: d[Globals.name],
+        //year
+        year: year
+      };
+    });
+}
+
+/**
+ *Returns an interpolated value for the current year
+ *
+ *@param {array} values - an array of [year, data] pairs
+ *@param {number} year - current year for which the interpolated data point corresponds to
+ */
+function interpolateValues(values, year) {
+    var i = bisect.left(values, year, 0, values.length - 1),
+        a = values[i];
+
+    if (i > 0) {
+      var b = values[i - 1],
+          t = (year - a[0]) / (b[0] - a[0]);
+      return a[1] * (1 - t) + b[1] * t;
+    }
+    return a[1];
+}
+
+
+//-----------------------------Helper Functions used throughout this javascript file-------------------------------
+/**
+ *Returns an array of dates according to precision units specified in config file
+ */
+function dateArray(){
+	var Date1 = new Date(Globals.yearMin);
+	var Date2 = new Date(Globals.yearMax);
+	var returnThis = [];
+	while(Date1 &lt;= Date2){
+		var tempDate = new Date(Date1);
+		returnThis.push(tempDate);
+		incrementDate(Date1);
+	}
+	return returnThis;
+}
+
+/**
+ *Parses all numbers from a string. \n
+ *Meant to retreive the precision units from precision string
+ *
+ *@param {string} String - the string containing precision configuration.
+ */
+function parsePrecisionInt(String){
+	return parseInt(String.match(/\d+/g));
+}
+
+/**
+ *Parses all letters from a string. \n
+ *Meant to retrieve the precision string from the precision string including numbers.
+ *
+ *@param {string} String - the string containing precision configuration.
+ */
+function parsePrecisionUnits(String){
+	return String.match(/[a-zA-Z]+/g)[0];
+}
+/**
+ *Checks to see if log axis min contains a number &lt;= 0, if zero return 1
+ *
+ *@param {number} xMin - number to check 
+ */
+function checkLogMin(xMin){
+	if(Globals.xMin &lt; 0){
+		d3.select(".title")
+			.append("text")
+			.style("color", "red")
+			.style("font-size", "12px")
+			.text('Error: log axis with negative values');
+		throw 'Error: log axis with negative values';
+	}
+	if(Globals.xMin == 0){
+		Globals.xMin += 1;
+	}
+	return Globals.xMin;
+}
+
+/**
+ *Calculates maximum number of ticks that can fit on a log axis
+ *
+ *@param {number} areaDim - area for the given axis
+ */
+function logTicks(areaDim){
+	if(areaDim &lt; 650){
+		if(areaDim &lt; 350){
+			if(areaDim &lt; 150){
+				return 2;
+			}else{
+				return 3;
+			}
+		}else{
+			return 6;
+		}
+	}else{
+		return 6;
+	}
+}
+
+/**
+ *Calculate maximum number of ticks which will fit on the y-axis
+ *
+ *@param {number} areaDim - height of area for y-axis
+ *@param {number} labelDim - height of largest label on y-axis
+ */
+function getMaxYTicks(areaDim, labelDim){
+	maxTicks = (areaDim)/(labelDim + 18);
+	maxTicks = d3.format(".0f")(maxTicks);
+	return parseInt(maxTicks);
+}
+
+/**Calculate maximum number of ticks which will fit on the x-axis
+ *
+ *@param {number} areaDim - width of area for x-axis
+ *@param {number} labelDim - width of largest label on x-axis
+ */
+function getMaxXTicks(areaDim, labelDim){
+	maxTicks = (areaDim - 120)/(labelDim + 25);
+	maxTicks = d3.format(".0f")(maxTicks);
+	return parseInt(maxTicks);
+}
+
+/**
+ *Returns an array of names according to the grouping variable specified in config file
+ *
+ *@param {object} json - json object with data 
+ */
+function getGroupingNames(json){
+	array = [];
+	var nested = d3.nest()
+		.key(function(d){return d[Globals.dotColor];})
+		.entries(json.data);
+
+	for(i = 0; i &lt; nested.length; i++){
+		array.push(nested[i].key);
+	}
+	return array.sort();
+}
+
+/**
+ *Return an array of the data for tracer paths
+ *
+ */
+function specificPathData(data){
+	returnThis = [];
+	for(i = 0; i &lt; tracerNames.length; i++){
+		for(j = 0; j &lt; data.length; j++){
+			if(tracerNames[i] == data[j][name]){
+				returnThis.push(data[j]);
+				break;
+			}
+		}
+	}
+	return returnThis;
+}
+
+/**
+ *Seperates annotations file into different shape types &lt;/p>
+ *Returns an object of annotations given shape type or false if no annotations exist for 
+ *the given parameter
+ *
+ *@param {String} shape - string specifying which shape data you want returned example: (line, rect, symbol, text)
+ */
+function retrieveAnnotations(shape){
+	var returnThis;
+	var nested = d3.nest()
+		.key(function(d){return d.ShapeType;})
+		.entries(Globals.annotationsJson.SpecificAnnotations);
+	nested.forEach(function(element){
+		if(element.key == shape){
+			returnThis = element;
+		}
+	})
+	if(returnThis){
+		return returnThis;
+	}else{
+		return false;
+	}
+}
+
+/**
+ *Acts in the same way as retrieveAnnotations() but it returns an 
+ *object containing the data of the specified shape from the annotation shape type 'symbol'
+ *
+ *@param {String} shape - string specifiying whihc shape data you want returned example: (circle, triangle, cross)
+ */
+function retrieveByShape(shape){
+	var returnThis;
+	data = retrieveAnnotations("Symbol");
+	var nested = d3.nest()
+		.key(function(d){return d.Properties.SymbolStyle;})
+		.entries(data.values);
+	nested.forEach(function(element){
+		if(element.key == shape){
+			returnThis = element;
+		}
+	})
+	if(returnThis){
+		return returnThis;
+	}else{
+		return false;
+	}
+}
+
+/**
+ *Adds data to the array and then nests that data by name &lt;/p>
+ *[d3.js nest]{@link https://github.com/d3/d3-3.x-api-reference/blob/master/Arrays.md#nest}
+ *
+ *@param {object} data - an object containing the data
+ *@param {array} array - an array containing data
+ */
+function nest(data, array){
+	for(i = 0; i &lt; data.length; i++){
+		array.push(data[i]);
+	}
+	var nested = d3.nest()
+		.key(function(d){return d.name;})
+		.entries(array);
+	return nested;
+}  
+
+/**
+ *Returns an array of names for each dot on the visualization
+ *
+ *@param {object} json - json object with data
+ */
+function getIndividualDots(json){
+	array = [];
+	var nested = d3.nest()
+		.key(function(d){return d[Globals.name];})
+		.entries(json.data);
+
+	for(i=0; i &lt; nested.length; i++){
+		array.push(nested[i].key);
+	}
+
+	return array.sort();
+}
+
+/**
+ *Returns a minimum value for the radius of dots (3.0px)
+ *
+ *@param {number} value - number to check minimum on
+ */
+function minRadius(value){
+	return value &lt; 3.0 ? 3.0 : value;
+}
+
+/**
+ *Calculates total time that should elapse between two time points, set at 1.33 seconds between each year
+ *
+ *@param {number} start - the starting year
+ *@param {number} end - the ending year
+ */
+function getTimeInterpolate(startDate, endDate){
+	distance = timeScale(endDate) - timeScale(startDate);
+	return distance * Globals.visSpeed;
+}
+
+function getTime(dateArray){
+	return 20000 / (dateArray.length - 1);
+}
+
+/**
+ *Checks to see if annotations exist for current time frame, if so return them
+ *
+ *@param {number} year
+ */
+function getAnnotations(year){
+	if(Globals.annotationsJson.GeneralAnnotations[Math.round(year)] != "undefined"){
+		return Globals.annotationsJson.GeneralAnnotations[Math.round(year)];
+	}else{
+		return null;
+	}
+}
+
+/**
+ *Parses through dateArray to return value closest to date.
+ *
+ *@param {object} date - date object which we want the closest date to.
+ */
+function getClosest(date) {
+    var close;
+    var distance;
+    for (i = 0; i &lt; Globals.dateArray.length; i++) {
+        if(timeDiff(date, Globals.dateArray[i]) &lt; distance || distance === undefined){
+        	distance = timeDiff(date, Globals.dateArray[i]);
+        	close = Globals.dateArray[i];
+        }
+    };
+    return close;
+}
+
+/**
+ *Returns an integer representing the difference between two dates
+ *
+ *@param {object} date1 - a date object
+ *@param {object} date2 - a date object
+ */
+function timeDiff(date1, date2){
+	return Math.abs(date2.getTime() - date1.getTime());
+}
+
+/**
+ *Depending on precision units from config file, incremments the date 
+ */
+function incrementDate(date){
+	switch(Globals.precisionUnit){
+		case "Year":
+			date.setFullYear(date.getFullYear() + Globals.precisionInt);
+			break;
+		case "Month":
+			date.setMonth(date.getMonth() + Globals.precisionInt);
+			break;
+		case "Day":
+			date.setDate(date.getDate() + Globals.precisionInt);
+			break;
+		case "Hour":
+			date.setHours(date.getHours() + Globals.precisionInt);
+			break;
+		case "Minute":
+			date.setMinutes(date.getMinutes() + Globals.precisionInt);
+			break;
+		case "Second":
+			date.setSeconds(date.getSeconds() + Globals.precisionInt);
+			break;
+		default:
+			break;
+	}
+}
+
+/**
+ *Depending on precision units from config file, decrements the date
+ */
+function decrementDate(date){
+	switch(Globals.precisionUnit){
+		case "Year":
+			date.setFullYear(date.getFullYear() - Globals.precisionInt);
+			break;
+		case "Month":
+			date.setMonth(date.getMonth() - Globals.precisionInt);
+			break;
+		case "Day":
+			date.setDate(date.getDate() - Globals.precisionInt);
+			break;
+		case "Hour":
+			date.setHours(date.getHours() - Globals.precisionInt);
+			break;
+		case "Minute":
+			date.setMinutes(date.getMinutes() - Globals.precisionInt);
+			break;
+		case "Second":
+			date.setSeconds(date.getSeconds() - Globals.precisionInt);
+			break;
+		default:
+			break;
+	}
+}
+
+//----------------------------Helper Functions that minipulate strings for d3.select() purposes-------------------------
+
+/**
+ *Converts the string into a selector name &lt;/p>
+ *ex: 'Denver Water' -> '.Denver.Water'
+ */
+String.prototype.classSelector = function(){
+	var string = this.split(" ");
+	var returnThis = ".";
+	for(i = 0; i &lt; string.length - 1; i++){
+		if(checkForSymbol(string[i]) != ""){
+			returnThis = returnThis + string[i].replace(/[^A-Za-z0-9]/g, '') + ".";
+		}
+	}
+	returnThis = returnThis + string[string.length-1].replace(/[^A-Za-z0-9]/g, '');
+	return returnThis;
+}
+
+/**
+ *Removes symbols form string, returns the string with no symbols
+ *
+ *@param {string} string - a string
+ */
+function checkForSymbol(string){
+	return string.replace(/[^A-Za-z0-9]/g, '');
+}
+
+/**
+ *Converts the string into a selector name &lt;/p>
+ *ex: 'Denver Water' -> '.Denver.Water'
+ */
+String.prototype.id = function(){
+	var string = this.split(" ");
+	var returnThis = "";
+	for(i = 0; i &lt; string.length - 1; i++){
+		if(checkForSymbol(string[i]) != ""){
+			returnThis = returnThis + string[i].replace(/[^A-Za-z0-9]/g, '') + "";
+		}
+	}
+	returnThis = returnThis + string[string.length-1].replace(/[^A-Za-z0-9]/g, '');
+	return returnThis;
+}
+
+/**
+ *Converts the string into an id selector name &lt;/p>
+ *ex: 'Denver Water' -> '.Denver.Water'
+ */
+String.prototype.idSelector = function(){
+	var string = this.split(" ");
+	var returnThis = "#";
+	for(i = 0; i &lt; string.length - 1; i++){
+		if(checkForSymbol(string[i]) != ""){
+			returnThis = returnThis + string[i].replace(/[^A-Za-z0-9]/g, '') + "";
+		}
+	}
+	returnThis = returnThis + string[string.length-1].replace(/[^A-Za-z0-9]/g, '');
+	return returnThis;
+}
+
+
+//-----------------------Helper functions that move elements forward or back in the svg canvas-------------------------
+/*
+ *Moves selected elements to front of SVG canvas
+ */
+d3.selection.prototype.moveToFront = function() {
+  return this.each(function(){
+    this.parentNode.appendChild(this);
+  });
+};
+
+/*
+ *Moves selected elements to back of SVG Canvas
+ */
+d3.selection.prototype.moveToBack = function() {  
+    return this.each(function() { 
+        var firstChild = this.parentNode.firstChild; 
+        if (firstChild) { 
+            this.parentNode.insertBefore(this, firstChild); 
+        } 
+    });
+};
+
+//-----------------------------------------Resizes the whole visualization--------------------------------------------
+//upate Table if windows is resized
+//in ./javascript/resize.js
+d3.select(window).on('resize', function(){
+	if(gapminderSelected){
+		resize();
+	}
+});
+/**
+ *Resizes the chart elements when window is resized
+ */
+function resize() {
+    Globals.height = $("#Gapminder").parent().height() - 270;
+	Globals.width = $(".box").width();
+
+	d3.select("svg.box").attr("height", Globals.height);
+
+	xScale.range([yTextBox.width + Globals.margin.left + 15, (Globals.width-25)]);
+	yScale.range([Globals.height - 40, 0]);
+
+	if(Globals.x_axis_type.toUpperCase() == "LOG"){
+		xAxis.scale(xScale)
+			.ticks(6, d3.format(",d"))
+			.tickSizeInner(-Globals.height)
+	}else{
+		xAxis.scale(xScale)
+			.ticks(getMaxXTicks(Globals.width, xTextBox.width) - 1)
+			.tickFormat(d3.format(","))
+			.tickSizeInner(-Globals.height)
+	}
+
+	if(Globals.y_axis_type.toUpperCase() == "LOG"){
+		yAxis.scale(yScale)
+			.ticks(6, d3.format(",d"))
+			.tickSizeInner(-(Globals.width - Globals.margin.right));
+	}else{
+		yAxis.scale(yScale)
+			.ticks(getMaxYTicks(Globals.height, yTextBox.height))
+			.tickSizeInner(-(Globals.width - Globals.margin.right));
+	}
+
+	xaxis.call(xAxis).attr("transform", "translate(0," + (Globals.height - 40) + ")");
+   	yaxis.call(yAxis).attr("transform", "translate(" + (yTextBox.width + Globals.margin.left + 15)  + ",0)");
+
+    xlabel.attr("x", (Globals.width/2)).attr("y", Globals.height - 5);
+
+    ylabel.attr("y", 0).attr("x", -((Globals.height - 100)/2));
+
+    //update dot
+	dot .attr("cx", function(d) { return xScale(x(d)); })
+	    .attr("cy", function(d) { return yScale(y(d)); })
+	    .attr("r", function(d) { return radiusScale(radius(d)); });
+
+	//update line paths (tracers) for dots
+	if(Globals.tracer){
+		line.x(function(d) {return xScale(x(d));}).y(function(d) {return yScale(y(d));})	
+		path.attr("d", function(d){return line(d.values);});
+	}
+
+	if($("#annotationLine").length){
+		annotationLine
+			.attr('x1', function(d){
+				return xScale(d.Properties.x1);
+			})
+			.attr('y1', function(d){
+				return yScale(d.Properties.y1 + 5);
+			})
+			.attr('x2', function(d){
+				return xScale(d.Properties.x2);
+			})
+			.attr('y2', function(d){
+				return yScale(d.Properties.y2);
+			})
+	}
+
+	if($("#annotationRect").length){
+		annotationRect
+			.attr('x', function(d){
+				return xScale(d.Properties.x1);
+			})
+			.attr('y', function(d){
+				return yScale(d.Properties.y1);
+			})
+			.attr('width', function(d){
+				var x1 = xScale(d.Properties.x1);
+				var x2 = xScale(d.Properties.x2);
+				return x2 - x1;
+			})
+			.attr('height', function(d){
+				var y1 = yScale(d.Properties.y1);
+				var y2 = yScale(d.Properties.y2);
+				return y2 - y1;
+			})
+	}
+
+	if($("#annotationCircle").length){
+		annotationCircle
+			.attr("transform", function(d){ 
+				return "translate(" + xScale(d.Properties.x) + "," + yScale(d.Properties.y) + ")";
+			})
+	}
+	if($("#annotationTriangle").length){
+		annotationTriangle
+			.attr("transform", function(d){ 
+				return "translate(" + xScale(d.Properties.x) + "," + yScale(d.Properties.y) + ")";
+			})
+	}
+	if($("#annotationCross").length){
+		annotationCross
+			.attr("transform", function(d){ 
+				return "translate(" + xScale(d.Properties.x) + "," + yScale(d.Properties.y) + ")rotate(45)";
+			})
+	}
+	if($("#annotationText").length){
+		annotationText
+			.attr("x", function(d){
+				return xScale(d.Properties.x);
+			})
+			.attr("y", function(d){
+				return yScale(d.Properties.y) + 5;
+			})
+	}
+	
+	d3.select("#legend").style("height", function(){
+			if(legendHeight &lt; ((Globals.height/2) - 20)){
+				return legendHeight + "px";
+			}else{
+				return (Globals.height/2) - 20 + "px";
+			}
+		});
+	d3.select("#sideTools").style("height", ((Globals.height/2) - 25) + "px");
+
+	timeScale.range([0, (Globals.width - 75)]);
+
+	d3.select(".track").attr("x1", timeScale.range()[0]).attr("x2", timeScale.range()[1]);
+	d3.select(".track-inset").attr("x1", timeScale.range()[0]).attr("x2", timeScale.range()[1]);
+	d3.select(".track-overlay").attr("x1", timeScale.range()[0]).attr("x2", timeScale.range()[1]);
+	handle.attr("transform", "translate(" + (timeScale(getClosest(Globals.currYear)) + ",0)"));
+	var slidertext = g.selectAll("text").data(timeScale.ticks(getMaxXTicks(Globals.width, dateText.width)));
+	slidertext.exit().remove();
+	slidertext.enter().append("text");
+	slidertext
+		.attr("x", function(d){
+			return timeScale(d);
+		})
+		.attr("text-anchor", "middle")
+		.text(function(d){return formatDate(d); });
+}
+
+//------------------------------------------------------Code for Data tab-----------------------------------------------------
+var tabulate = function (data,columns) {
+  var table = d3.select('#data').append('table')
+	var thead = table.append('thead')
+	var tbody = table.append('tbody')
+
+	thead.append('tr')
+	  .selectAll('th')
+	    .data(columns)
+	    .enter()
+	  .append('th')
+	    .text(function (d) { return d })
+
+	var rows = tbody.selectAll('tr')
+	    .data(data)
+	    .enter()
+	  .append('tr')
+
+	var cells = rows.selectAll('td')
+	    .data(function(row) {
+	    	return columns.map(function (column) {
+	    		return { column: column, value: row[column] }
+	      })
+      })
+      .enter()
+    .append('td')
+      .text(function (d) { return d.value })
+
+  return table;
+}
+
+d3.csv(Globals.CSV,function (data) {
+	var columns = [Globals.year, Globals.xVar, Globals.yVar, Globals.size, Globals.dotColor, Globals.name];
+ 	tabulate(data,columns)
+})
+
+//----------------------------Test Functions---------------------------
+//EXPOLRING NAMESPACE
+/*for (var item in window) {
+    var type = typeof window[item];
+    if (type != "function") {
+        console.log(item + " (" + type + ")");
+    }
+}*/
+
+//--------------------------------Tests--------------------------------</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#annotationsButton">annotationsButton</a></li><li><a href="global.html#backButton">backButton</a></li><li><a href="global.html#checkData">checkData</a></li><li><a href="global.html#checkForSymbol">checkForSymbol</a></li><li><a href="global.html#checkLogMin">checkLogMin</a></li><li><a href="global.html#color">color</a></li><li><a href="global.html#createNewObject">createNewObject</a></li><li><a href="global.html#date">date</a></li><li><a href="global.html#dateArray">dateArray</a></li><li><a href="global.html#decrementDate">decrementDate</a></li><li><a href="global.html#displayYear">displayYear</a></li><li><a href="global.html#draggedYear">draggedYear</a></li><li><a href="global.html#forwardButton">forwardButton</a></li><li><a href="global.html#getAnnotations">getAnnotations</a></li><li><a href="global.html#getClosest">getClosest</a></li><li><a href="global.html#getGroupingNames">getGroupingNames</a></li><li><a href="global.html#getIndividualDots">getIndividualDots</a></li><li><a href="global.html#getMaxXTicks">getMaxXTicks</a></li><li><a href="global.html#getMaxYTicks">getMaxYTicks</a></li><li><a href="global.html#getTimeInterpolate">getTimeInterpolate</a></li><li><a href="global.html#incrementDate">incrementDate</a></li><li><a href="global.html#initializeDeminsions">initializeDeminsions</a></li><li><a href="global.html#interpolateData">interpolateData</a></li><li><a href="global.html#interpolatePath">interpolatePath</a></li><li><a href="global.html#interpolateValues">interpolateValues</a></li><li><a href="global.html#key">key</a></li><li><a href="global.html#legendButton">legendButton</a></li><li><a href="global.html#logTicks">logTicks</a></li><li><a href="global.html#makeJsonObj">makeJsonObj</a></li><li><a href="global.html#minRadius">minRadius</a></li><li><a href="global.html#mousedown">mousedown</a></li><li><a href="global.html#mouseout">mouseout</a></li><li><a href="global.html#mouseover">mouseover</a></li><li><a href="global.html#mouseoverAnnotation">mouseoverAnnotation</a></li><li><a href="global.html#nest">nest</a></li><li><a href="global.html#order">order</a></li><li><a href="global.html#parsePrecisionInt">parsePrecisionInt</a></li><li><a href="global.html#parsePrecisionUnits">parsePrecisionUnits</a></li><li><a href="global.html#pauseButton">pauseButton</a></li><li><a href="global.html#playAnimation">playAnimation</a></li><li><a href="global.html#playButton">playButton</a></li><li><a href="global.html#position">position</a></li><li><a href="global.html#radius">radius</a></li><li><a href="global.html#replay">replay</a></li><li><a href="global.html#replayButton">replayButton</a></li><li><a href="global.html#resize">resize</a></li><li><a href="global.html#retrieveAnnotations">retrieveAnnotations</a></li><li><a href="global.html#retrieveByShape">retrieveByShape</a></li><li><a href="global.html#selectAllButton">selectAllButton</a></li><li><a href="global.html#setSpeed">setSpeed</a></li><li><a href="global.html#specificPathData">specificPathData</a></li><li><a href="global.html#stopAnimation">stopAnimation</a></li><li><a href="global.html#timeDiff">timeDiff</a></li><li><a href="global.html#tracerButton">tracerButton</a></li><li><a href="global.html#tweenYear">tweenYear</a></li><li><a href="global.html#updateJsonObj">updateJsonObj</a></li><li><a href="global.html#updatePath">updatePath</a></li><li><a href="global.html#x">x</a></li><li><a href="global.html#y">y</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Mon Aug 28 2017 14:49:45 GMT-0600 (Mountain Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

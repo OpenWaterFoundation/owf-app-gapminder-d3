@@ -1,0 +1,20 @@
+{
+  "name": "gapminder-d3-js",
+  "version": "1.0.0",
+  "description": "This folder contains everything necessary to deploy a basic example of Gapminder as a static web page, with tabbed panels for viewing different data views as it related to the gapminder visualization.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/d3": "^6.2.0",
+    "bootstrap": "^4.5.3",
+    "clusterize.js": "^0.18.1",
+    "i": "^0.3.6",
+    "jquery": "^3.5.1",
+    "papaparse": "^5.3.0",
+    "select2": "^4.0.13"
+  }
+}
